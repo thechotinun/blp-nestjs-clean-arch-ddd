@@ -1,21 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { UseCase } from '../../../../shared/application/index.js';
 import {
-  type Todo,
-  TODO_REPOSITORY,
-  TodoNotFoundException,
-  type TodoRepository,
-} from '../../domain/index.js';
+  getTodoViewOrThrow,
+  TODO_QUERY_SERVICE,
+  type TodoQueryService,
+} from '../todo.query.js';
+import type { TodoView } from '../todo.view.js';
 
 @Injectable()
-export class GetTodoUseCase implements UseCase<string, Todo> {
+export class GetTodoUseCase implements UseCase<string, TodoView> {
   constructor(
-    @Inject(TODO_REPOSITORY) private readonly todoRepository: TodoRepository,
+    @Inject(TODO_QUERY_SERVICE) private readonly todoQuery: TodoQueryService,
   ) {}
 
-  async execute(id: string): Promise<Todo> {
-    const todo = await this.todoRepository.findById(id);
-    if (!todo) throw new TodoNotFoundException();
-    return todo;
+  execute(id: string): Promise<TodoView> {
+    return getTodoViewOrThrow(this.todoQuery, id);
   }
 }

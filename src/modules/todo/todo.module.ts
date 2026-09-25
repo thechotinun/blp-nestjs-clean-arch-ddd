@@ -5,11 +5,13 @@ import {
   DeleteTodoUseCase,
   GetTodoUseCase,
   ListTodosUseCase,
+  TODO_QUERY_SERVICE,
   UpdateTodoUseCase,
-} from './application/use-cases/index.js';
+} from './application/index.js';
 import { TODO_REPOSITORY } from './domain/index.js';
 import { TodoMapper } from './infrastructure/persistence/todo.mapper.js';
 import { TodoOrmEntity } from './infrastructure/persistence/todo.orm-entity.js';
+import { TodoTypeOrmQueryService } from './infrastructure/persistence/todo.typeorm-query.js';
 import { TodoTypeOrmRepository } from './infrastructure/persistence/todo.typeorm-repository.js';
 import { TodoController } from './presentation/todo.controller.js';
 
@@ -19,6 +21,7 @@ import { TodoController } from './presentation/todo.controller.js';
   providers: [
     TodoMapper,
     { provide: TODO_REPOSITORY, useClass: TodoTypeOrmRepository },
+    { provide: TODO_QUERY_SERVICE, useClass: TodoTypeOrmQueryService },
     CreateTodoUseCase,
     GetTodoUseCase,
     ListTodosUseCase,

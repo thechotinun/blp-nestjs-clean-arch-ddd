@@ -1,11 +1,12 @@
 import { InvalidTodoTitleException } from './exceptions/index.js';
-import { Todo, TODO_TITLE_MAX_LENGTH } from './todo.entity.js';
+import { Todo } from './todo.entity.js';
+import { TODO_TITLE_MAX_LENGTH } from './value-objects/index.js';
 
 describe('Todo', () => {
   it('should create with trimmed title and null description by default', () => {
     const todo = Todo.create({ title: '  Buy milk  ' });
 
-    expect(todo.title).toBe('Buy milk');
+    expect(todo.title.value).toBe('Buy milk');
     expect(todo.description).toBeNull();
     expect(todo.isActive).toBe(true);
   });
@@ -21,11 +22,11 @@ describe('Todo', () => {
     const todo = Todo.create({ title: 'A', description: 'desc' });
 
     todo.update({ title: ' B ' });
-    expect(todo.title).toBe('B');
+    expect(todo.title.value).toBe('B');
     expect(todo.description).toBe('desc');
 
     todo.update({ description: null });
-    expect(todo.title).toBe('B');
+    expect(todo.title.value).toBe('B');
     expect(todo.description).toBeNull();
   });
 
@@ -35,6 +36,6 @@ describe('Todo', () => {
     expect(() => todo.update({ title: ' ' })).toThrow(
       InvalidTodoTitleException,
     );
-    expect(todo.title).toBe('A');
+    expect(todo.title.value).toBe('A');
   });
 });

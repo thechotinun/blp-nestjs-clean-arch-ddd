@@ -24,31 +24,33 @@ Migration CLI runs against compiled `dist/` (no ts-node). Generated migrations g
 ```
 src/
 ├── main.ts
-├── app.module.ts                 # ConfigModule (global) + DatabaseModule + bounded-context modules
+├── app.module.ts                 # ConfigModule (global) + DatabaseModule + error catalog + bounded-context modules
+├── error-codes.ts                # API error code catalog (composition root)
 ├── config/                       # configuration.ts — env -> typed config (single source)
-├── shared/                       # shared kernel — no business rules
-│   ├── domain/                   # Entity (+ EntityAudit), AggregateRoot, ValueObject, DomainEvent, exceptions/, Repository port, Paginated
-│   ├── application/              # UseCase<I, O>
-│   ├── infrastructure/database/  # DatabaseModule, TypeOrmConfigService, BaseOrmEntity, TypeOrmBaseRepository, audit mapper, Mapper, data-source (CLI), migrations/
-│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, ValidationPipe, PaginationQueryDto, BaseResource
+├── shared/                       # shared kernel — no business rules, never imports modules/
+│   ├── domain/                   # Entity (id + isActive), AggregateRoot, ValueObject, DomainEvent, DomainException, Repository port (write side)
+│   ├── application/              # UseCase<I, O>, QueryService port (read side), Paginated/PaginationParams, BaseView
+│   ├── infrastructure/database/  # DatabaseModule, TypeOrmConfigService, BaseOrmEntity, TypeOrmBaseRepository, TypeOrmBaseQueryService + toBaseView, Mapper, data-source (CLI), migrations/, testing/ (spec fixtures)
+│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, ErrorCodeRegistry, ValidationPipe, PaginationQueryDto
 └── modules/<context>/            # one folder per bounded context — reference implementation: modules/todo
-    ├── domain/
-    │   ├── <name>.entity.ts              # aggregate / entity (extends AggregateRoot / Entity)
-    │   ├── value-objects/<name>.vo.ts
-    │   ├── events/<name>.event.ts
-    │   ├── exceptions/<name>.exception.ts   # extends DomainException
-    │   └── <name>.repository.ts          # port: `interface XRepository extends Repository<X>` + `X_REPOSITORY` symbol
+    ├── domain/                   # write model: behaviour + invariants, no audit/pagination
+    │   ├── <name>.entity.ts              # aggregate (extends AggregateRoot): create() / restore(props, id, isActive)
+    │   ├── value-objects/<name>.vo.ts    # create(raw) validates; restore(stored) trusts DB
+    │   ├── exceptions/                   # <name>-error-key.ts + <name>.exception.ts (extends DomainException)
+    │   └── <name>.repository.ts          # write port: `interface XRepository extends Repository<X>` + `X_REPOSITORY`
     ├── application/
-    │   ├── use-cases/<action>.use-case.ts   # implements UseCase
-    │   └── dto/                              # use-case input/output (plain types)
-    ├── infrastructure/
-    │   ├── persistence/<name>.orm-entity.ts      # TypeORM @Entity, extends BaseOrmEntity
-    │   ├── persistence/<name>.mapper.ts          # implements Mapper<Domain, OrmEntity>
-    │   └── persistence/<name>.typeorm-repository.ts  # implements the domain port
+    │   ├── <name>.view.ts                # read model: `interface XView extends BaseView` — returned by use cases and the API
+    │   ├── <name>.query.ts               # read port: `interface XQueryService extends QueryService<XView>` + `X_QUERY_SERVICE`
+    │   └── use-cases/<action>.use-case.ts   # implements UseCase; returns XView / Paginated<XView> / void
+    ├── infrastructure/persistence/
+    │   ├── <name>.orm-entity.ts          # TypeORM @Entity, extends BaseOrmEntity
+    │   ├── <name>.mapper.ts              # aggregate <-> ORM (write side only; no audit columns)
+    │   ├── <name>.typeorm-repository.ts  # extends TypeOrmBaseRepository, implements XRepository
+    │   └── <name>.typeorm-query.ts       # extends TypeOrmBaseQueryService, implements XQueryService (toView)
     ├── presentation/
-    │   ├── <name>.controller.ts
-    │   ├── <name>.resource.ts                # `toXResource(entity)` = { ...toBaseResource(entity), ...fields }
-    │   └── dto/                              # request DTOs (class-validator)
+    │   ├── <name>.controller.ts          # returns use-case results as-is
+    │   └── dto/                          # request DTOs (class-validator)
+    ├── testing/                          # in-memory adapters for specs (repository + query share one store)
     └── <context>.module.ts
 ```
 
@@ -56,32 +58,39 @@ src/
 
 `presentation → application → domain ← infrastructure`
 
-- `domain/` imports **nothing** from `@nestjs/*`, `typeorm`, or other layers. Pure TS only.
-- `application/` depends on domain only (ports, entities). No TypeORM. `@Injectable`/`@Inject` allowed for DI.
-- `infrastructure/` implements domain ports. Only place TypeORM is used.
-- `presentation/` calls use cases; never touches repositories or ORM entities directly.
-- Domain entity and ORM entity are separate classes, converted via a `*.mapper.ts`. Never return ORM entities past infrastructure.
-- Bind ports in the context module: `{ provide: USER_REPOSITORY, useClass: UserTypeOrmRepository }`.
+- `domain/` imports **nothing** from `@nestjs/*`, `typeorm`, or other layers. Pure TS only. May import `shared/domain`.
+- `application/` depends on domain + `shared/application`. No TypeORM. `@Injectable`/`@Inject` allowed for DI.
+- `infrastructure/` implements domain (repository) and application (query) ports. Only place TypeORM is used.
+- `presentation/` calls use cases only; never touches repositories, query services, aggregates or ORM entities.
+- Each layer may import the same or inner layers of its own module and of `shared/`. `shared/` never imports `modules/`; modules never import each other.
+- Bind ports in the context module: `{ provide: X_REPOSITORY, useClass: XTypeOrmRepository }`, `{ provide: X_QUERY_SERVICE, useClass: XTypeOrmQueryService }`.
+
+## Write side vs read side
+
+- **Write (commands):** use case loads the aggregate via `XRepository.findById`, calls its methods (invariants live there), then `save(aggregate)` / `delete(aggregate)`. Never delete by id without loading — the aggregate's `delete()` holds deletion rules.
+- **Read (queries):** use case calls `XQueryService` which reads ORM rows straight into `XView` — no aggregate. Lists, pagination, filters, audit fields live here only.
+- Commands that must return data (POST/PATCH) save, then read the view back via the query service (`getXViewOrThrow`).
 
 ## Conventions
 
 - **Imports:** relative paths with `.js` extension (`'./user.entity.js'`). No tsconfig `paths` aliases — tsc does not rewrite them in ESM output.
 - **No `__dirname` / `require`** — use `import.meta.url` / `import.meta.dirname`.
-- **Identity:** IDs are UUIDs generated in the domain (`Entity` base uses `randomUUID()`), so ORM PK is `@PrimaryColumn('uuid')` (from `BaseOrmEntity`), never `@PrimaryGeneratedColumn`.
-- **Audit fields:** every ORM entity extends `BaseOrmEntity` → `id`, `isActive`, `createdDate/By`, `updatedDate/By`, `deletedDate/By` (columns `is_active`, `created_by`, …) (soft delete via `DeleteDateColumn`). Domain side: `Entity.audit` (`EntityAudit`), passed as 3rd arg on `restore(props, id, audit)`. In `*.mapper.ts` use `toEntityAudit(record)` / `...toAuditColumns(entity.audit)` — never map audit fields by hand. `*By` values are not set automatically yet.
-- **Repositories:** domain port `Repository<T>` gives `findById`, `findAll(PaginationParams)`, `exists`, `save`, `delete` (soft). Implementation extends `TypeOrmBaseRepository<Domain, OrmEntity>` (constructor: `@InjectRepository(XOrmEntity)` repo + mapper). Module-specific queries: add to the module's port interface and implement in the module repository using `this.repository` / `this.mapper`. `save()` reloads the row so generated dates are returned.
-- **Use cases:** one class per action, `@Injectable()`, inject the port with `@Inject(X_REPOSITORY)`. Throw module `DomainException`s (e.g. not found) here, not in controllers.
+- **Identity:** IDs are UUIDs generated in the domain (`Entity` base uses `randomUUID()`), so ORM PK is `@PrimaryColumn({ name: 'id', type: 'uuid' })` (from `BaseOrmEntity`), never `@PrimaryGeneratedColumn`.
+- **Audit fields:** every ORM entity extends `BaseOrmEntity` → `id`, `isActive`, `createdDate/By`, `updatedDate/By`, `deletedDate/By` (columns `is_active`, `created_by`, …; soft delete via `DeleteDateColumn`). Audit is **read-side only**: exposed through `toBaseView(record)` in `XView`. Domain entities carry only `id` + `isActive`. Mappers do not write audit columns — TypeORM leaves undefined columns untouched on update. `*By` values are not set automatically yet.
+- **Repositories (write):** `Repository<T>` = `findById`, `save` (returns void), `delete(entity)` (soft). Implement via `TypeOrmBaseRepository<Aggregate, OrmEntity>` (`@InjectRepository(XOrmEntity)` repo + mapper). Module-specific write methods: add to `XRepository`, implement with `this.repository` / `this.mapper`.
+- **Query services (read):** `QueryService<TView>` = `findById`, `findAll(PaginationParams)` → `Paginated<TView>` (newest first). Implement via `TypeOrmBaseQueryService<OrmEntity, XView>` + `toView(record)` = `{ ...toBaseView(record), ...fields }` with every value `?? null`.
+- **Use cases:** one class per action, `@Injectable()`, inject ports with `@Inject(X_REPOSITORY)` / `@Inject(X_QUERY_SERVICE)`. Return `XView` (never aggregates). Throw module `DomainException`s (e.g. not found) here, not in controllers.
 - **Validation:** global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) → unknown body/query fields are rejected with 400. List endpoints take `@Query() PaginationQueryDto` → `query.toParams(configService.get('PER_PAGE'))` (`page` ≥ 1, `perPage` 1..100). Route ids use `ParseUUIDPipe`.
 - **Empty values:** respond with `null`, not `""`.
 - **Naming:** DB = snake_case, code = camelCase. Always set the column name explicitly in the decorator — no naming strategy: `@Column({ name: 'due_date', type: 'date', nullable: true }) dueDate`. Same for relations: `@JoinColumn({ name: 'assigned_user_id' })`. Table names explicit, plural snake_case: `@Entity('todos')`.
-- **Migrations:** generate with `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` (needs DB) or hand-write matching the naming strategy.
+- **Migrations:** generate with `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` (needs DB) or hand-write matching the explicit column names in `BaseOrmEntity`.
 - **Entities registration:** `autoLoadEntities: true` — register ORM entities with `TypeOrmModule.forFeature([...])` in each context module.
 - **Relations (ESM):** type relation properties with `Relation<T>` from typeorm to avoid circular-import TDZ errors:
   `@ManyToOne(() => UserOrmEntity) user: Relation<UserOrmEntity>;`
-- **Aggregates:** create via static factory (`static create(...)`), rehydrate via `static restore(props, id)`; constructor is `protected`/`private`. Mutate state only through methods that enforce invariants.
-- **Value objects:** immutable, validated in factory, compared with `equals()`.
+- **Aggregates:** create via static factory (`static create(...)`), rehydrate via `static restore(props, id, isActive)`; constructor is `protected`/`private`. Mutate state only through methods that enforce invariants (incl. `delete()` before deletion).
+- **Value objects:** immutable, `create(raw)` validates user input, `restore(stored)` skips validation for DB data, compared with `equals()`. Example: `TodoTitle`.
 - **Domain events:** raised with `addDomainEvent()` inside the aggregate; collected with `pullDomainEvents()` after persistence. Dispatcher not yet wired.
-- **Tests:** vitest globals (`vi.fn`, `describe`, `it`). Unit specs next to source (`*.spec.ts`). Domain tests need no Nest testing module.
+- **Tests:** vitest globals (`vi.fn`, `describe`, `it`). Unit specs next to source (`*.spec.ts`). Domain tests need no Nest testing module. Module specs use `testing/in-memory-<name>.store.ts` (one store for both ports). Shared specs use `shared/infrastructure/database/testing/sample.fixture.ts` — never import a module. `testing/` folders are excluded from the build.
 
 ## API response & errors
 
@@ -90,7 +99,7 @@ Routes are served under `/api/v1/...` (global prefix `api` + URI versioning, def
 
 - **Controllers return plain data** — never build the envelope by hand.
   - Single object → `{ data, status: { code, message } }`
-  - `Paginated<T>` (from `shared/domain`) → `{ data, links, meta, status }`. Use `paginated.map(toResource)` to shape items.
+  - `Paginated<T>` (from `shared/application`) → `{ data, links, meta, status }`.
   - `status.code` is the real HTTP status (`201` for POST, `@HttpCode` respected). 204 / `StreamableFile` pass through unwrapped.
 - **Pagination links:** `first` = `?perPage=N`, `previous`/`next`/`last` = `?page=X&perPage=N`, `""` when absent. Other query params are kept.
 - **Errors:** throw a `DomainException` subclass from domain/application — never a Nest `HttpException` there. Domain knows only the error **key**; the numeric code lives in the catalog.

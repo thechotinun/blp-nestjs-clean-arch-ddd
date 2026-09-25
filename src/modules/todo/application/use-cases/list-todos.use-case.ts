@@ -1,25 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { UseCase } from '../../../../shared/application/index.js';
 import type {
   Paginated,
   PaginationParams,
-} from '../../../../shared/domain/index.js';
-import {
-  type Todo,
-  TODO_REPOSITORY,
-  type TodoRepository,
-} from '../../domain/index.js';
+  UseCase,
+} from '../../../../shared/application/index.js';
+import { TODO_QUERY_SERVICE, type TodoQueryService } from '../todo.query.js';
+import type { TodoView } from '../todo.view.js';
 
 @Injectable()
 export class ListTodosUseCase implements UseCase<
   PaginationParams,
-  Paginated<Todo>
+  Paginated<TodoView>
 > {
   constructor(
-    @Inject(TODO_REPOSITORY) private readonly todoRepository: TodoRepository,
+    @Inject(TODO_QUERY_SERVICE) private readonly todoQuery: TodoQueryService,
   ) {}
 
-  execute(params: PaginationParams): Promise<Paginated<Todo>> {
-    return this.todoRepository.findAll(params);
+  execute(params: PaginationParams): Promise<Paginated<TodoView>> {
+    return this.todoQuery.findAll(params);
   }
 }

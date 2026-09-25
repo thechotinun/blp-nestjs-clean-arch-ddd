@@ -4,7 +4,6 @@ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { ErrorCodes } from '../../../error-codes.js';
-import { Paginated } from '../../../shared/domain/index.js';
 import {
   ApiResponseInterceptor,
   createValidationPipe,
@@ -18,46 +17,19 @@ import {
   GetTodoUseCase,
   ListTodosUseCase,
   UpdateTodoUseCase,
-} from '../application/use-cases/index.js';
-import { Todo, TODO_REPOSITORY, type TodoRepository } from '../domain/index.js';
+  TODO_QUERY_SERVICE,
+} from '../application/index.js';
+import { Todo, TODO_REPOSITORY } from '../domain/index.js';
+import { InMemoryTodoStore } from '../testing/in-memory-todo.store.js';
 import { TodoController } from './todo.controller.js';
-
-// In-memory port implementation: exercises controller + use cases + pipes without a DB.
-class InMemoryTodoRepository implements TodoRepository {
-  readonly items = new Map<string, Todo>();
-
-  async findById(id: string) {
-    return this.items.get(id) ?? null;
-  }
-  async findAll({ page, perPage }: { page: number; perPage: number }) {
-    const all = [...this.items.values()];
-    const start = (page - 1) * perPage;
-    return new Paginated(
-      all.slice(start, start + perPage),
-      all.length,
-      page,
-      perPage,
-    );
-  }
-  async exists(id: string) {
-    return this.items.has(id);
-  }
-  async save(todo: Todo) {
-    this.items.set(todo.id, todo);
-    return todo;
-  }
-  async delete(id: string) {
-    return this.items.delete(id);
-  }
-}
 
 describe('TodoController (HTTP)', () => {
   let app: INestApplication;
-  let repository: InMemoryTodoRepository;
+  let store: InMemoryTodoStore;
   const url = '/api/v1/todos';
 
   beforeEach(async () => {
-    repository = new InMemoryTodoRepository();
+    store = new InMemoryTodoStore();
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -67,7 +39,8 @@ describe('TodoController (HTTP)', () => {
       ],
       controllers: [TodoController],
       providers: [
-        { provide: TODO_REPOSITORY, useValue: repository },
+        { provide: TODO_REPOSITORY, useValue: store.repository },
+        { provide: TODO_QUERY_SERVICE, useValue: store.query },
         CreateTodoUseCase,
         GetTodoUseCase,
         ListTodosUseCase,
@@ -103,9 +76,9 @@ describe('TodoController (HTTP)', () => {
       data: {
         id: expect.any(String),
         isActive: true,
-        createdDate: null,
+        createdDate: expect.any(String),
         createdBy: null,
-        updatedDate: null,
+        updatedDate: expect.any(String),
         updatedBy: null,
         deletedDate: null,
         deletedBy: null,
@@ -135,7 +108,7 @@ describe('TodoController (HTTP)', () => {
   });
 
   it('GET list should paginate with default perPage from config', async () => {
-    await repository.save(Todo.create({ title: 'A' }));
+    await store.repository.save(Todo.create({ title: 'A' }));
 
     const res = await request(app.getHttpServer()).get(url);
 
@@ -193,9 +166,8 @@ describe('TodoController (HTTP)', () => {
   });
 
   it('PATCH should update and allow clearing description', async () => {
-    const todo = await repository.save(
-      Todo.create({ title: 'A', description: 'd' }),
-    );
+    const todo = Todo.create({ title: 'A', description: 'd' });
+    await store.repository.save(todo);
 
     const res = await request(app.getHttpServer())
       .patch(`${url}/${todo.id}`)
@@ -206,7 +178,8 @@ describe('TodoController (HTTP)', () => {
   });
 
   it('DELETE should return 204 then 404', async () => {
-    const todo = await repository.save(Todo.create({ title: 'A' }));
+    const todo = Todo.create({ title: 'A' });
+    await store.repository.save(todo);
 
     await request(app.getHttpServer()).delete(`${url}/${todo.id}`).expect(204);
     await request(app.getHttpServer()).delete(`${url}/${todo.id}`).expect(404);

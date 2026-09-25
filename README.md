@@ -1,114 +1,343 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# NestJS Clean Architecture + DDD Starter
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A starter for building REST APIs with **NestJS 12**, **TypeORM 1.x** and **PostgreSQL**, organised with **Clean Architecture** and **Domain-Driven Design**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+It ships with a complete reference module (`todo`) that shows every layer end to end. Copy its shape when you add a new bounded context.
 
-## Description
+## What's included
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **Layered modules:** `domain` / `application` / `infrastructure` / `presentation`, with dependencies pointing inward only.
+- **Write/read split:** aggregates are saved through repositories; lists and details are read through query services straight into views.
+- **Base classes:** `Entity`, `AggregateRoot`, `ValueObject`, `DomainException`, `TypeOrmBaseRepository`, `TypeOrmBaseQueryService`.
+- **Standard API envelope:** every success and error response has the same shape. Pagination links and meta are built automatically.
+- **Central error catalog:** all API error codes live in one file, with compile-time checks for duplicates and missing codes.
+- **Audit columns** on every table (`is_active`, `created_*`, `updated_*`, `deleted_*`) and soft delete.
+- **Validation:** `class-validator` with a global `ValidationPipe` that rejects unknown fields.
+- **Tooling:** native ESM, Vitest, oxlint, Prettier, TypeORM migrations.
 
-## Project setup
+## Requirements
+
+- Node.js **20.11+**
+- PostgreSQL **14+**
+
+## Quick start
 
 ```bash
-$ npm install
+# 1. Install
+npm install
+
+# 2. Configure
+cp .env.example .env        # then fill in DATABASE_* values
+
+# 3. Start a database (skip if you already have one)
+docker run -d --name local-postgres -p 5432:5432 \
+  -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -e POSTGRES_DB=app \
+  postgres:17-alpine
+
+# 4. Create tables
+npm run migration:run
+
+# 5. Run
+npm run start:dev
 ```
 
-## Compile and run the project
+The API is served under `http://localhost:<PORT>/api/v1`. Try it:
 
 ```bash
-# development
-$ npm run start
+curl -X POST http://localhost:3200/api/v1/todos \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Buy milk","description":"2 bottles"}'
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+curl 'http://localhost:3200/api/v1/todos?page=1&perPage=10'
 ```
 
-## Run tests
+## Configuration
 
-```bash
-# unit tests
-$ npm run test
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | HTTP port | `3000` |
+| `APP_URL` | Public base URL | `http://localhost:3000` |
+| `DATABASE_TYPE` | TypeORM driver | `postgres` |
+| `DATABASE_HOST` / `DATABASE_PORT` | Database address | – / `5432` |
+| `DATABASE_NAME` | Database name | – |
+| `DATABASE_NAME_TEST` | Database name used when `NODE_ENV=test` | – |
+| `DATABASE_USER` / `DATABASE_PASSWORD` | Credentials | – |
+| `DATABASE_SYNC` | TypeORM `synchronize`. Keep `false` outside local experiments and use migrations. The migration CLI always forces it off. | `false` |
+| `PER_PAGE` | Default page size for list endpoints | `30` |
+| `JWT_*` | Reserved for authentication (not implemented yet) | – |
 
-# e2e tests
-$ npm run test:e2e
+`NODE_ENV=test` loads `.env.test` instead of `.env`.
 
-# test coverage
-$ npm run test:cov
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run start:dev` | Start in watch mode |
+| `npm run build` | Compile to `dist/` |
+| `npm run start:prod` | Run the compiled app |
+| `npm test` | Unit and integration tests (no database needed) |
+| `npm run test:e2e` | End-to-end tests (needs a database and `.env.test`) |
+| `npm run test:cov` | Tests with coverage |
+| `npm run lint` | oxlint |
+| `npm run format` | Prettier |
+| `npx tsc --noEmit -p tsconfig.json` | Type-check, including specs (Vitest does not type-check) |
+| `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` | Generate a migration from entity changes (needs a database) |
+| `npm run migration:run` / `migration:revert` | Apply / roll back migrations |
+
+The migration CLI builds first and runs against `dist/`, so no ts-node is needed.
+
+## Architecture
+
+```
+presentation ──► application ──► domain ◄── infrastructure
 ```
 
-## Deployment
+| Layer | Responsibility | Contains | Must not |
+|---|---|---|---|
+| **domain** | Business rules and invariants | Aggregates, value objects, domain exceptions, repository **interfaces** | Import NestJS, TypeORM or any other layer |
+| **application** | One use case per action: orchestrates domain objects | Use cases, views (read models), query service **interfaces** | Use TypeORM or decide business rules itself |
+| **infrastructure** | Implements the interfaces with real technology | TypeORM repositories and query services, ORM entities, mappers | Contain business rules |
+| **presentation** | Translates HTTP to use-case calls and back | Controllers, request DTOs, response interceptor, exception filter | Touch repositories, aggregates or ORM entities |
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Rules that hold across the codebase:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- `shared/` is the shared kernel. Modules may use it, but it never imports a module.
+- Modules never import each other.
+- `app.module.ts`, `main.ts` and `error-codes.ts` form the composition root. This is the only place that knows every module.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```mermaid
+flowchart LR
+    subgraph presentation
+        CTRL["TodoController"]
+    end
+    subgraph application
+        UC["UpdateTodoUseCase"]
+        QPORT[["TodoQueryService «interface»"]]
+        VIEW["TodoView"]
+    end
+    subgraph domain
+        TODO["Todo «aggregate»"]
+        TITLE["TodoTitle «value object»"]
+        RPORT[["TodoRepository «interface»"]]
+    end
+    subgraph infrastructure
+        REPO["TodoTypeOrmRepository"]
+        QRY["TodoTypeOrmQueryService"]
+        MAP["TodoMapper"]
+        ORM["TodoOrmEntity"]
+    end
+    DB[("PostgreSQL")]
+
+    CTRL --> UC
+    UC --> RPORT
+    UC --> QPORT
+    UC --> TODO
+    UC --> VIEW
+    TODO --> TITLE
+    REPO -. implements .-> RPORT
+    QRY -. implements .-> QPORT
+    REPO --> MAP --> TODO
+    MAP --> ORM
+    QRY --> ORM
+    QRY --> VIEW
+    ORM --> DB
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Write side vs read side
 
-## Observability
+- **Commands** (create, update, delete):
+  1. Load the aggregate through the repository.
+  2. Call its methods. The invariants run there.
+  3. Save or delete the aggregate.
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+  Deleting always loads the aggregate first, so its `delete()` rules apply.
+- **Queries** (get, list) read ORM rows straight into a view through the query service. Pagination, filters and audit fields exist only on this side.
+- POST and PATCH save through the repository, then read the result back through the query service.
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+### Request flow: `PATCH /api/v1/todos/:id`
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant P as Presentation
+    participant U as UpdateTodoUseCase
+    participant R as TodoRepository
+    participant D as Todo / TodoTitle
+    participant Q as TodoQueryService
 
-## Resources
+    C->>P: PATCH { title }
+    P->>P: ParseUUIDPipe + UpdateTodoDto
+    P->>U: execute({ id, title })
+    U->>R: findById(id)
+    R-->>U: Todo
+    U->>D: todo.update({ title })
+    D->>D: TodoTitle.create(title) — may throw INVALID_TODO_TITLE
+    U->>R: save(todo)
+    U->>Q: findById(id)
+    Q-->>U: TodoView
+    U-->>P: TodoView
+    P-->>C: 200 { data, status }
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## Project structure
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```
+src/
+├── main.ts                       # bootstrap: /api prefix, URI versioning (v1)
+├── app.module.ts                 # composition root
+├── error-codes.ts                # API error code catalog
+├── config/                       # env -> typed config
+├── shared/                       # shared kernel
+│   ├── domain/                   # Entity, AggregateRoot, ValueObject, DomainException, Repository port
+│   ├── application/              # UseCase, QueryService port, Paginated, BaseView
+│   ├── infrastructure/database/  # TypeORM config, BaseOrmEntity, base repository/query, migrations/
+│   └── presentation/http/        # response interceptor, exception filter, validation pipe, pagination DTO
+└── modules/
+    └── todo/                     # reference module
+        ├── domain/               # Todo, TodoTitle, exceptions, TodoRepository
+        ├── application/          # use cases, TodoView, TodoQueryService
+        ├── infrastructure/       # ORM entity, mapper, TypeORM repository + query service
+        ├── presentation/         # controller, request DTOs
+        ├── testing/              # in-memory adapters for specs
+        └── todo.module.ts
+```
 
-## Support
+## API conventions
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Success
 
-## Stay in touch
+A controller returns plain data. `ApiResponseInterceptor` wraps it.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```json
+{
+  "data": {
+    "id": "1c6d5a24-7453-4e46-8b7f-f56ef1d564e6",
+    "isActive": true,
+    "createdDate": "2026-09-24T10:51:52.557Z",
+    "createdBy": null,
+    "updatedDate": "2026-09-24T10:51:52.557Z",
+    "updatedBy": null,
+    "deletedDate": null,
+    "deletedBy": null,
+    "title": "Buy milk",
+    "description": null
+  },
+  "status": { "code": 200, "message": "OK" }
+}
+```
 
-## License
+Returning a `Paginated<T>` adds `links` and `meta`:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```json
+{
+  "data": [ ... ],
+  "links": {
+    "first": "/api/v1/todos?perPage=10",
+    "previous": "",
+    "next": "/api/v1/todos?page=2&perPage=10",
+    "last": "/api/v1/todos?page=3&perPage=10"
+  },
+  "meta": { "totalItems": 25, "itemCount": 10, "itemsPerPage": 10, "totalPages": 3, "currentPage": 1 },
+  "status": { "code": 200, "message": "OK" }
+}
+```
+
+- `status.code` is the real HTTP status, for example `201` for POST.
+- `204` responses have no body.
+- Empty values are `null`.
+
+### Errors
+
+```json
+{
+  "status": { "code": 404, "message": "Not Found" },
+  "error": { "code": 100101, "message": "TODO_NOT_FOUND", "errors": [] }
+}
+```
+
+- `error.message` is a stable error key.
+- `error.code` comes from the catalog in `src/error-codes.ts`.
+- `errors` lists validation messages when there are any.
+
+| Source | HTTP | `error.code` / `error.message` |
+|---|---|---|
+| `DomainException` | from its type: `VALIDATION` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404, `CONFLICT` 409, `BUSINESS_RULE` 422 | catalog code / its key |
+| Request validation (`ValidationPipe`) | 400 | `900422 VALIDATE_ERROR` |
+| Other 400 (e.g. malformed UUID) | 400 | `900423 BAD_REQUEST` |
+| 401 / 403 | 401 / 403 | `900403 UNAUTHORIZED` |
+| Anything else (unknown route, unhandled error) | 404 / 500 | `0 UNDEFINED_ERROR` (details are logged, never returned) |
+
+### Error catalog
+
+`src/error-codes.ts` is the single place where numeric codes are assigned. Everyone can see which codes are taken.
+
+```ts
+export const ErrorCodes = {
+  0: 'UNDEFINED_ERROR',
+  900422: 'VALIDATE_ERROR',
+  // TODO 1001xx
+  100101: 'TODO_NOT_FOUND',
+  100106: 'INVALID_TODO_TITLE',
+} as const satisfies Record<number, string>;
+```
+
+The domain only knows the key (`'TODO_NOT_FOUND'`), never the number. These guards catch mistakes when several people work in parallel:
+
+- A duplicate code does not compile (TS1117).
+- A key that is thrown but missing from the catalog does not compile. The error names the key.
+- A duplicate key fails at startup and in `error-codes.spec.ts`.
+
+Ranges: `9000xx` system, `1001xx` todo. Give each new module the next range: `1002xx`, `1003xx`, and so on.
+
+## Adding a new module
+
+Use `src/modules/todo` as the template. For a module `order`:
+
+1. **Domain:** `modules/order/domain/`
+   - `order.entity.ts`: `class Order extends AggregateRoot` with `create()`, `restore(props, id, isActive)` and behaviour methods
+   - `value-objects/*.vo.ts`: `create(raw)` validates, `restore(stored)` trusts the database
+   - `exceptions/order-error-key.ts`: `export const OrderErrorKey = { NOT_FOUND: 'ORDER_NOT_FOUND' } as const`
+   - `exceptions/*.exception.ts`: `extends DomainException`
+   - `order.repository.ts`: `interface OrderRepository extends Repository<Order>` and `ORDER_REPOSITORY`
+2. **Application:** `modules/order/application/`
+   - `order.view.ts`: `interface OrderView extends BaseView`
+   - `order.query.ts`: `interface OrderQueryService extends QueryService<OrderView>` and `ORDER_QUERY_SERVICE`
+   - `use-cases/*.use-case.ts`: one class per action, returning `OrderView`, `Paginated<OrderView>` or `void`
+3. **Infrastructure:** `modules/order/infrastructure/persistence/`
+   - `order.orm-entity.ts`: `@Entity('orders')`, `extends BaseOrmEntity`, with an explicit snake_case `name` on every column
+   - `order.mapper.ts`: aggregate ↔ ORM entity; never writes audit columns
+   - `order.typeorm-repository.ts`: `extends TypeOrmBaseRepository`
+   - `order.typeorm-query.ts`: `extends TypeOrmBaseQueryService`, with `toView = { ...toBaseView(record), ...fields }`
+4. **Presentation:** `modules/order/presentation/`
+   - `order.controller.ts`: calls use cases and returns their results as-is
+   - `dto/*.dto.ts`: `class-validator` request DTOs
+5. **Module:** in `order.module.ts`, register `TypeOrmModule.forFeature([OrderOrmEntity])`, bind both ports, and add the use cases. Import the module in `app.module.ts`.
+6. **Error codes:** add `1002xx` entries to `src/error-codes.ts` and add `OrderErrorKey` to `ThrownErrorKey`.
+7. **Migration:** `npm run migration:generate -- src/shared/infrastructure/database/migrations/CreateOrders`
+8. **Tests:** add an in-memory store in `modules/order/testing/` shared by both ports, then spec the entity, the use cases and the controller.
+
+## Conventions
+
+- **ESM imports:** use relative paths with the `.js` extension (`'./order.entity.js'`). Don't use tsconfig path aliases. Use `import.meta.url` instead of `__dirname`.
+- **Identity:** UUIDs are generated in the domain (`randomUUID()`), so the primary key is `@PrimaryColumn`, not `@PrimaryGeneratedColumn`.
+- **Naming:** the database uses snake_case and the code uses camelCase.
+  - Set column names explicitly: `@Column({ name: 'due_date', ... }) dueDate`.
+  - Name tables in plural snake_case.
+- **Relations:** type relation properties as `Relation<T>` to avoid ESM circular-import errors.
+- **Validation:**
+  - DTOs check shape: type, required, length.
+  - Value objects and aggregates check business meaning.
+- **Tests:**
+  - Specs sit next to the source file as `*.spec.ts`.
+  - `testing/` folders hold test-only adapters and fixtures and are excluded from the build.
+  - Shared specs never import a module.
+
+Detailed rules for contributors and AI coding agents are in [CLAUDE.md](CLAUDE.md).
+
+## Not included yet
+
+- Authentication and current-user tracking. `createdBy`, `updatedBy` and `deletedBy` are always `null` for now.
+- A domain event dispatcher. Aggregates can collect events, but nothing publishes them.
+- Transactions / unit of work.
+- Swagger / OpenAPI.

@@ -5,6 +5,12 @@ import {
   TODO_REPOSITORY,
   type TodoRepository,
 } from '../../domain/index.js';
+import {
+  getTodoViewOrThrow,
+  TODO_QUERY_SERVICE,
+  type TodoQueryService,
+} from '../todo.query.js';
+import type { TodoView } from '../todo.view.js';
 
 export interface CreateTodoInput {
   title: string;
@@ -12,12 +18,15 @@ export interface CreateTodoInput {
 }
 
 @Injectable()
-export class CreateTodoUseCase implements UseCase<CreateTodoInput, Todo> {
+export class CreateTodoUseCase implements UseCase<CreateTodoInput, TodoView> {
   constructor(
     @Inject(TODO_REPOSITORY) private readonly todoRepository: TodoRepository,
+    @Inject(TODO_QUERY_SERVICE) private readonly todoQuery: TodoQueryService,
   ) {}
 
-  execute(input: CreateTodoInput): Promise<Todo> {
-    return this.todoRepository.save(Todo.create(input));
+  async execute(input: CreateTodoInput): Promise<TodoView> {
+    const todo = Todo.create(input);
+    await this.todoRepository.save(todo);
+    return getTodoViewOrThrow(this.todoQuery, todo.id);
   }
 }

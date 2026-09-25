@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
-import type { PaginationParams } from '../../domain/index.js';
+import type { PaginationParams } from '../../application/index.js';
 
 export const MAX_PER_PAGE = 100;
 

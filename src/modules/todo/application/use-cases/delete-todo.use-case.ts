@@ -13,7 +13,10 @@ export class DeleteTodoUseCase implements UseCase<string, void> {
   ) {}
 
   async execute(id: string): Promise<void> {
-    const deleted = await this.todoRepository.delete(id);
-    if (!deleted) throw new TodoNotFoundException();
+    const todo = await this.todoRepository.findById(id);
+    if (!todo) throw new TodoNotFoundException();
+
+    todo.delete();
+    await this.todoRepository.delete(todo);
   }
 }

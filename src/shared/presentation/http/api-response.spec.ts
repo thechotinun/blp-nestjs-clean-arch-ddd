@@ -10,11 +10,8 @@ import {
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import {
-  DomainErrorType,
-  DomainException,
-  Paginated,
-} from '../../domain/index.js';
+import { Paginated } from '../../application/index.js';
+import { DomainErrorType, DomainException } from '../../domain/index.js';
 import { ApiResponseInterceptor } from './api-response.interceptor.js';
 import {
   ERROR_CODE_REGISTRY,
