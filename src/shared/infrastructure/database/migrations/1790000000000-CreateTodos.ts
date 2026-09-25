@@ -1,10 +1,10 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateTodos1790000000000 implements MigrationInterface {
-  name = 'CreateTodos1790000000000';
+	name = 'CreateTodos1790000000000';
 
-  async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`
+	async up(queryRunner: QueryRunner): Promise<void> {
+		await queryRunner.query(`
       CREATE TABLE "todos" (
         "id" uuid NOT NULL,
         "is_active" boolean NOT NULL DEFAULT true,
@@ -19,9 +19,9 @@ export class CreateTodos1790000000000 implements MigrationInterface {
         CONSTRAINT "PK_todos_id" PRIMARY KEY ("id")
       )
     `);
-  }
+	}
 
-  async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE "todos"`);
-  }
+	async down(queryRunner: QueryRunner): Promise<void> {
+		await queryRunner.query(`DROP TABLE "todos"`);
+	}
 }

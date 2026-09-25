@@ -63,6 +63,7 @@ src/
 - `infrastructure/` implements domain (repository) and application (query) ports. Only place TypeORM is used.
 - `presentation/` calls use cases only; never touches repositories, query services, aggregates or ORM entities.
 - Each layer may import the same or inner layers of its own module and of `shared/`. `shared/` never imports `modules/`; modules never import each other.
+- Enforced by `npm run lint`: `.oxlintrc.json` has `no-restricted-imports` overrides per layer (framework/ORM imports in domain, cross-layer imports, shared → modules, domain → `error-codes.ts`). Keep them in sync if you add a layer or folder.
 - Bind ports in the context module: `{ provide: X_REPOSITORY, useClass: XTypeOrmRepository }`, `{ provide: X_QUERY_SERVICE, useClass: XTypeOrmQueryService }`.
 
 ## Write side vs read side

@@ -8,13 +8,13 @@ import { TodoOrmEntity } from './todo.orm-entity.js';
 
 @Injectable()
 export class TodoTypeOrmRepository
-  extends TypeOrmBaseRepository<Todo, TodoOrmEntity>
-  implements TodoRepository
+	extends TypeOrmBaseRepository<Todo, TodoOrmEntity>
+	implements TodoRepository
 {
-  constructor(
-    @InjectRepository(TodoOrmEntity) repository: Repository<TodoOrmEntity>,
-    mapper: TodoMapper,
-  ) {
-    super(repository, mapper);
-  }
+	constructor(
+		@InjectRepository(TodoOrmEntity) repository: Repository<TodoOrmEntity>,
+		mapper: TodoMapper,
+	) {
+		super(repository, mapper);
+	}
 }

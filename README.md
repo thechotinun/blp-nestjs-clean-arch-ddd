@@ -78,7 +78,7 @@ curl 'http://localhost:3200/api/v1/todos?page=1&perPage=10'
 | `npm test` | Unit and integration tests (no database needed) |
 | `npm run test:e2e` | End-to-end tests (needs a database and `.env.test`) |
 | `npm run test:cov` | Tests with coverage |
-| `npm run lint` | oxlint |
+| `npm run lint` | oxlint (`.oxlintrc.json`), including layer-boundary import rules |
 | `npm run format` | Prettier |
 | `npx tsc --noEmit -p tsconfig.json` | Type-check, including specs (Vitest does not type-check) |
 | `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` | Generate a migration from entity changes (needs a database) |
@@ -103,6 +103,7 @@ Rules that hold across the codebase:
 
 - `shared/` is the shared kernel. Modules may use it, but it never imports a module.
 - Modules never import each other.
+- `npm run lint` enforces the layer rules and keeps `shared/` isolated: a forbidden import, such as `typeorm` in a domain file, fails the lint. Module-to-module imports are not checked by lint, so catch them in review.
 - `app.module.ts`, `main.ts` and `error-codes.ts` form the composition root. This is the only place that knows every module.
 
 ```mermaid

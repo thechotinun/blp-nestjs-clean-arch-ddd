@@ -1,0 +1,221 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "import"],
+	"categories": {
+		"correctness": "error"
+	},
+	"env": {
+		"es2024": true,
+		"node": true
+	},
+	"ignorePatterns": ["dist", "build", "node_modules", "coverage", "*.config.js", "*.config.ts"],
+	"rules": {
+		"no-unused-vars": "off",
+		"no-shadow": "off",
+		"typescript/no-unused-vars": [
+			"error",
+			{
+				"argsIgnorePattern": "^_"
+			}
+		],
+		"typescript/no-explicit-any": "error",
+		"typescript/no-shadow": "error",
+		"max-lines": [
+			"error",
+			{
+				"max": 300,
+				"skipBlankLines": true,
+				"skipComments": true
+			}
+		],
+		"max-lines-per-function": [
+			"warn",
+			{
+				"max": 60
+			}
+		],
+		"max-params": ["warn", 4],
+		"max-depth": ["warn", 3],
+		"complexity": ["warn", 10],
+		"no-var": "error",
+		"prefer-const": "error",
+		"eqeqeq": ["error", "always"],
+		"no-console": "warn",
+		"no-debugger": "error",
+		"no-duplicate-imports": "error",
+		"consistent-return": "warn"
+	},
+	"overrides": [
+		{
+			"files": ["src/modules/*/domain/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"@nestjs/*",
+									"typeorm",
+									"typeorm/*",
+									"express",
+									"class-validator",
+									"class-transformer"
+								],
+								"message": "Domain must be pure TypeScript: no framework or ORM imports."
+							},
+							{
+								"group": ["**/application/**", "**/infrastructure/**", "**/presentation/**"],
+								"message": "Domain may only import domain code (its own module or shared/domain)."
+							},
+							{
+								"group": ["**/error-codes.js"],
+								"message": "Only the composition root and specs may use the error catalog; domain knows error keys only."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/modules/*/application/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["typeorm", "typeorm/*", "@nestjs/typeorm", "express"],
+								"message": "Application must not depend on persistence or HTTP details."
+							},
+							{
+								"group": ["**/infrastructure/**", "**/presentation/**"],
+								"message": "Application may only import domain and application code."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/modules/*/presentation/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["typeorm", "typeorm/*", "@nestjs/typeorm", "**/infrastructure/**"],
+								"message": "Presentation talks to use cases only, never to persistence."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/shared/domain/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"@nestjs/*",
+									"typeorm",
+									"typeorm/*",
+									"express",
+									"class-validator",
+									"class-transformer"
+								],
+								"message": "Domain must be pure TypeScript: no framework or ORM imports."
+							},
+							{
+								"group": ["**/application/**", "**/infrastructure/**", "**/presentation/**"],
+								"message": "Domain may only import domain code (its own module or shared/domain)."
+							},
+							{
+								"group": ["**/modules/**", "**/error-codes.js"],
+								"message": "Shared kernel must not depend on modules or the composition root (error-codes.ts)."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/shared/application/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["typeorm", "typeorm/*", "@nestjs/typeorm", "express"],
+								"message": "Application must not depend on persistence or HTTP details."
+							},
+							{
+								"group": ["**/infrastructure/**", "**/presentation/**"],
+								"message": "Application may only import domain and application code."
+							},
+							{
+								"group": ["**/modules/**", "**/error-codes.js"],
+								"message": "Shared kernel must not depend on modules or the composition root (error-codes.ts)."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/shared/infrastructure/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["**/modules/**", "**/error-codes.js"],
+								"message": "Shared kernel must not depend on modules or the composition root (error-codes.ts)."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/shared/presentation/**/*.ts"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["typeorm", "typeorm/*", "@nestjs/typeorm", "**/infrastructure/**"],
+								"message": "Presentation talks to use cases only, never to persistence."
+							},
+							{
+								"group": ["**/modules/**", "**/error-codes.js"],
+								"message": "Shared kernel must not depend on modules or the composition root (error-codes.ts)."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/**/*.controller.ts"],
+			"rules": {
+				"max-params": "off"
+			}
+		},
+		{
+			"files": ["**/*.spec.ts", "**/*.e2e-spec.ts", "src/**/testing/**/*.ts"],
+			"rules": {
+				"max-lines": "off",
+				"max-lines-per-function": "off"
+			}
+		}
+	]
+}

@@ -1,10 +1,10 @@
 export enum DomainErrorType {
-  VALIDATION = 'VALIDATION',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  FORBIDDEN = 'FORBIDDEN',
-  NOT_FOUND = 'NOT_FOUND',
-  CONFLICT = 'CONFLICT',
-  BUSINESS_RULE = 'BUSINESS_RULE',
+	VALIDATION = 'VALIDATION',
+	UNAUTHORIZED = 'UNAUTHORIZED',
+	FORBIDDEN = 'FORBIDDEN',
+	NOT_FOUND = 'NOT_FOUND',
+	CONFLICT = 'CONFLICT',
+	BUSINESS_RULE = 'BUSINESS_RULE',
 }
 
 /**
@@ -20,12 +20,12 @@ export enum DomainErrorType {
  * }
  */
 export abstract class DomainException extends Error {
-  protected constructor(
-    readonly type: DomainErrorType,
-    readonly key: string,
-    readonly errors: unknown[] = [],
-  ) {
-    super(key);
-    this.name = new.target.name;
-  }
+	protected constructor(
+		readonly type: DomainErrorType,
+		readonly key: string,
+		readonly errors: unknown[] = [],
+	) {
+		super(key);
+		this.name = new.target.name;
+	}
 }

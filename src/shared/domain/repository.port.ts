@@ -11,8 +11,8 @@ import type { Entity } from './entity.base.js';
  * }
  */
 export interface Repository<TEntity extends Entity<object>> {
-  findById(id: string): Promise<TEntity | null>;
-  save(entity: TEntity): Promise<void>;
-  /** Soft delete. Load the aggregate first so its deletion rules run. */
-  delete(entity: TEntity): Promise<void>;
+	findById(id: string): Promise<TEntity | null>;
+	save(entity: TEntity): Promise<void>;
+	/** Soft delete. Load the aggregate first so its deletion rules run. */
+	delete(entity: TEntity): Promise<void>;
 }
