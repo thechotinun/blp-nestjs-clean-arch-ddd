@@ -19,6 +19,10 @@ npm run migration:revert
 
 Migration CLI runs against compiled `dist/` (no ts-node). Generated migrations go in `src/.../migrations/` and are compiled by `build`.
 
+## Git hooks & commits
+
+Husky: `pre-commit` → lint-staged (Prettier + oxlint on staged files), `commit-msg` → commitlint, `pre-push` → `tsc --noEmit` + `npm test`. Commit messages: Conventional Commits, `type(scope): subject`, types `feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert`, subject not upper-case, header ≤ 100 chars. Do not bypass hooks with `--no-verify`.
+
 ## Layout
 
 ```
@@ -109,9 +113,9 @@ Routes are served under `/api/v1/...` (global prefix `api` + URI versioning, def
   export const TodoErrorKey = { NOT_FOUND: 'TODO_NOT_FOUND' } as const;
   // modules/todo/domain/exceptions/todo-not-found.exception.ts
   export class TodoNotFoundException extends DomainException {
-    constructor() {
-      super(DomainErrorType.NOT_FOUND, TodoErrorKey.NOT_FOUND);
-    }
+  	constructor() {
+  		super(DomainErrorType.NOT_FOUND, TodoErrorKey.NOT_FOUND);
+  	}
   }
   ```
   Body: `{ status: { code, message }, error: { code: <catalog code>, message: <key>, errors } }`. `DomainErrorType` → HTTP: VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, BUSINESS_RULE 422.

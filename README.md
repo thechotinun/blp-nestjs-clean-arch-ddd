@@ -53,38 +53,59 @@ curl 'http://localhost:3200/api/v1/todos?page=1&perPage=10'
 
 ## Configuration
 
-| Variable | Description | Default |
-|---|---|---|
-| `PORT` | HTTP port | `3000` |
-| `APP_URL` | Public base URL | `http://localhost:3000` |
-| `DATABASE_TYPE` | TypeORM driver | `postgres` |
-| `DATABASE_HOST` / `DATABASE_PORT` | Database address | – / `5432` |
-| `DATABASE_NAME` | Database name | – |
-| `DATABASE_NAME_TEST` | Database name used when `NODE_ENV=test` | – |
-| `DATABASE_USER` / `DATABASE_PASSWORD` | Credentials | – |
-| `DATABASE_SYNC` | TypeORM `synchronize`. Keep `false` outside local experiments and use migrations. The migration CLI always forces it off. | `false` |
-| `PER_PAGE` | Default page size for list endpoints | `30` |
-| `JWT_*` | Reserved for authentication (not implemented yet) | – |
+| Variable                              | Description                                                                                                               | Default                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `PORT`                                | HTTP port                                                                                                                 | `3000`                  |
+| `APP_URL`                             | Public base URL                                                                                                           | `http://localhost:3000` |
+| `DATABASE_TYPE`                       | TypeORM driver                                                                                                            | `postgres`              |
+| `DATABASE_HOST` / `DATABASE_PORT`     | Database address                                                                                                          | – / `5432`              |
+| `DATABASE_NAME`                       | Database name                                                                                                             | –                       |
+| `DATABASE_NAME_TEST`                  | Database name used when `NODE_ENV=test`                                                                                   | –                       |
+| `DATABASE_USER` / `DATABASE_PASSWORD` | Credentials                                                                                                               | –                       |
+| `DATABASE_SYNC`                       | TypeORM `synchronize`. Keep `false` outside local experiments and use migrations. The migration CLI always forces it off. | `false`                 |
+| `PER_PAGE`                            | Default page size for list endpoints                                                                                      | `30`                    |
+| `JWT_*`                               | Reserved for authentication (not implemented yet)                                                                         | –                       |
 
 `NODE_ENV=test` loads `.env.test` instead of `.env`.
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `npm run start:dev` | Start in watch mode |
-| `npm run build` | Compile to `dist/` |
-| `npm run start:prod` | Run the compiled app |
-| `npm test` | Unit and integration tests (no database needed) |
-| `npm run test:e2e` | End-to-end tests (needs a database and `.env.test`) |
-| `npm run test:cov` | Tests with coverage |
-| `npm run lint` | oxlint (`.oxlintrc.json`), including layer-boundary import rules |
-| `npm run format` | Prettier |
-| `npx tsc --noEmit -p tsconfig.json` | Type-check, including specs (Vitest does not type-check) |
-| `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` | Generate a migration from entity changes (needs a database) |
-| `npm run migration:run` / `migration:revert` | Apply / roll back migrations |
+| Command                                                                              | Description                                                      |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `npm run start:dev`                                                                  | Start in watch mode                                              |
+| `npm run build`                                                                      | Compile to `dist/`                                               |
+| `npm run start:prod`                                                                 | Run the compiled app                                             |
+| `npm test`                                                                           | Unit and integration tests (no database needed)                  |
+| `npm run test:e2e`                                                                   | End-to-end tests (needs a database and `.env.test`)              |
+| `npm run test:cov`                                                                   | Tests with coverage                                              |
+| `npm run lint`                                                                       | oxlint (`.oxlintrc.json`), including layer-boundary import rules |
+| `npm run format`                                                                     | Prettier                                                         |
+| `npx tsc --noEmit -p tsconfig.json`                                                  | Type-check, including specs (Vitest does not type-check)         |
+| `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` | Generate a migration from entity changes (needs a database)      |
+| `npm run migration:run` / `migration:revert`                                         | Apply / roll back migrations                                     |
 
 The migration CLI builds first and runs against `dist/`, so no ts-node is needed.
+
+## Git hooks
+
+[Husky](https://typicode.github.io/husky/) installs these hooks on `npm install`:
+
+| Hook         | Runs                                                                                            | Blocks when                                         |
+| ------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `pre-commit` | `lint-staged`: Prettier and oxlint on staged `*.ts` files, Prettier on staged `*.json` / `*.md` | a lint error (including a layer-boundary violation) |
+| `commit-msg` | commitlint (`commitlint.config.ts`)                                                             | the message is not a Conventional Commit            |
+| `pre-push`   | `tsc --noEmit` and `npm test`                                                                   | type errors or failing tests                        |
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): subject`.
+
+- **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- **Subject:** must not be written in upper case.
+- **Header:** 100 characters at most.
+
+```
+feat(todo): add due date
+fix(todo): return 404 when deleting twice
+```
 
 ## Architecture
 
@@ -92,12 +113,12 @@ The migration CLI builds first and runs against `dist/`, so no ts-node is needed
 presentation ──► application ──► domain ◄── infrastructure
 ```
 
-| Layer | Responsibility | Contains | Must not |
-|---|---|---|---|
-| **domain** | Business rules and invariants | Aggregates, value objects, domain exceptions, repository **interfaces** | Import NestJS, TypeORM or any other layer |
-| **application** | One use case per action: orchestrates domain objects | Use cases, views (read models), query service **interfaces** | Use TypeORM or decide business rules itself |
-| **infrastructure** | Implements the interfaces with real technology | TypeORM repositories and query services, ORM entities, mappers | Contain business rules |
-| **presentation** | Translates HTTP to use-case calls and back | Controllers, request DTOs, response interceptor, exception filter | Touch repositories, aggregates or ORM entities |
+| Layer              | Responsibility                                       | Contains                                                                | Must not                                       |
+| ------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- |
+| **domain**         | Business rules and invariants                        | Aggregates, value objects, domain exceptions, repository **interfaces** | Import NestJS, TypeORM or any other layer      |
+| **application**    | One use case per action: orchestrates domain objects | Use cases, views (read models), query service **interfaces**            | Use TypeORM or decide business rules itself    |
+| **infrastructure** | Implements the interfaces with real technology       | TypeORM repositories and query services, ORM entities, mappers          | Contain business rules                         |
+| **presentation**   | Translates HTTP to use-case calls and back           | Controllers, request DTOs, response interceptor, exception filter       | Touch repositories, aggregates or ORM entities |
 
 Rules that hold across the codebase:
 
@@ -152,6 +173,7 @@ flowchart LR
   3. Save or delete the aggregate.
 
   Deleting always loads the aggregate first, so its `delete()` rules apply.
+
 - **Queries** (get, list) read ORM rows straight into a view through the query service. Pagination, filters and audit fields exist only on this side.
 - POST and PATCH save through the repository, then read the result back through the query service.
 
@@ -212,19 +234,19 @@ A controller returns plain data. `ApiResponseInterceptor` wraps it.
 
 ```json
 {
-  "data": {
-    "id": "1c6d5a24-7453-4e46-8b7f-f56ef1d564e6",
-    "isActive": true,
-    "createdDate": "2026-09-24T10:51:52.557Z",
-    "createdBy": null,
-    "updatedDate": "2026-09-24T10:51:52.557Z",
-    "updatedBy": null,
-    "deletedDate": null,
-    "deletedBy": null,
-    "title": "Buy milk",
-    "description": null
-  },
-  "status": { "code": 200, "message": "OK" }
+	"data": {
+		"id": "1c6d5a24-7453-4e46-8b7f-f56ef1d564e6",
+		"isActive": true,
+		"createdDate": "2026-09-24T10:51:52.557Z",
+		"createdBy": null,
+		"updatedDate": "2026-09-24T10:51:52.557Z",
+		"updatedBy": null,
+		"deletedDate": null,
+		"deletedBy": null,
+		"title": "Buy milk",
+		"description": null
+	},
+	"status": { "code": 200, "message": "OK" }
 }
 ```
 
@@ -252,8 +274,8 @@ Returning a `Paginated<T>` adds `links` and `meta`:
 
 ```json
 {
-  "status": { "code": 404, "message": "Not Found" },
-  "error": { "code": 100101, "message": "TODO_NOT_FOUND", "errors": [] }
+	"status": { "code": 404, "message": "Not Found" },
+	"error": { "code": 100101, "message": "TODO_NOT_FOUND", "errors": [] }
 }
 ```
 
@@ -261,13 +283,13 @@ Returning a `Paginated<T>` adds `links` and `meta`:
 - `error.code` comes from the catalog in `src/error-codes.ts`.
 - `errors` lists validation messages when there are any.
 
-| Source | HTTP | `error.code` / `error.message` |
-|---|---|---|
-| `DomainException` | from its type: `VALIDATION` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404, `CONFLICT` 409, `BUSINESS_RULE` 422 | catalog code / its key |
-| Request validation (`ValidationPipe`) | 400 | `900422 VALIDATE_ERROR` |
-| Other 400 (e.g. malformed UUID) | 400 | `900423 BAD_REQUEST` |
-| 401 / 403 | 401 / 403 | `900403 UNAUTHORIZED` |
-| Anything else (unknown route, unhandled error) | 404 / 500 | `0 UNDEFINED_ERROR` (details are logged, never returned) |
+| Source                                         | HTTP                                                                                                                       | `error.code` / `error.message`                           |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `DomainException`                              | from its type: `VALIDATION` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404, `CONFLICT` 409, `BUSINESS_RULE` 422 | catalog code / its key                                   |
+| Request validation (`ValidationPipe`)          | 400                                                                                                                        | `900422 VALIDATE_ERROR`                                  |
+| Other 400 (e.g. malformed UUID)                | 400                                                                                                                        | `900423 BAD_REQUEST`                                     |
+| 401 / 403                                      | 401 / 403                                                                                                                  | `900403 UNAUTHORIZED`                                    |
+| Anything else (unknown route, unhandled error) | 404 / 500                                                                                                                  | `0 UNDEFINED_ERROR` (details are logged, never returned) |
 
 ### Error catalog
 
@@ -275,11 +297,11 @@ Returning a `Paginated<T>` adds `links` and `meta`:
 
 ```ts
 export const ErrorCodes = {
-  0: 'UNDEFINED_ERROR',
-  900422: 'VALIDATE_ERROR',
-  // TODO 1001xx
-  100101: 'TODO_NOT_FOUND',
-  100106: 'INVALID_TODO_TITLE',
+	0: 'UNDEFINED_ERROR',
+	900422: 'VALIDATE_ERROR',
+	// TODO 1001xx
+	100101: 'TODO_NOT_FOUND',
+	100106: 'INVALID_TODO_TITLE',
 } as const satisfies Record<number, string>;
 ```
 
