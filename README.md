@@ -53,18 +53,18 @@ curl 'http://localhost:3200/api/v1/todos?page=1&perPage=10'
 
 ## Configuration
 
-| Variable                              | Description                                                                                                               | Default                 |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `PORT`                                | HTTP port                                                                                                                 | `3000`                  |
-| `APP_URL`                             | Public base URL                                                                                                           | `http://localhost:3000` |
-| `DATABASE_TYPE`                       | TypeORM driver                                                                                                            | `postgres`              |
-| `DATABASE_HOST` / `DATABASE_PORT`     | Database address                                                                                                          | – / `5432`              |
-| `DATABASE_NAME`                       | Database name                                                                                                             | –                       |
-| `DATABASE_NAME_TEST`                  | Database name used when `NODE_ENV=test`                                                                                   | –                       |
-| `DATABASE_USER` / `DATABASE_PASSWORD` | Credentials                                                                                                               | –                       |
-| `DATABASE_SYNC`                       | TypeORM `synchronize`. Keep `false` outside local experiments and use migrations. The migration CLI always forces it off. | `false`                 |
-| `PER_PAGE`                            | Default page size for list endpoints                                                                                      | `30`                    |
-| `JWT_*`                               | Reserved for authentication (not implemented yet)                                                                         | –                       |
+| Variable                              | Description                                                                                                                               | Default                 |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `PORT`                                | HTTP port                                                                                                                                 | `3000`                  |
+| `APP_URL`                             | Public base URL                                                                                                                           | `http://localhost:3000` |
+| `DATABASE_TYPE`                       | TypeORM driver                                                                                                                            | `postgres`              |
+| `DATABASE_HOST` / `DATABASE_PORT`     | Database address                                                                                                                          | – / `5432`              |
+| `DATABASE_NAME`                       | Database name                                                                                                                             | –                       |
+| `DATABASE_NAME_TEST`                  | Database name used when `NODE_ENV=test`                                                                                                   | –                       |
+| `DATABASE_USER` / `DATABASE_PASSWORD` | Credentials                                                                                                                               | –                       |
+| `DATABASE_SYNC`                       | TypeORM `synchronize`. Keep `false` outside local experiments and use migrations. The migration commands ignore it and never synchronize. | `false`                 |
+| `PER_PAGE`                            | Default page size for list endpoints                                                                                                      | `30`                    |
+| `JWT_*`                               | Reserved for authentication (not implemented yet)                                                                                         | –                       |
 
 `NODE_ENV=test` loads `.env.test` instead of `.env`.
 
