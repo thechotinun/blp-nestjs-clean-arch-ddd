@@ -1,23 +1,42 @@
-import { getMetadataArgsStorage } from 'typeorm';
+import { Column, DataSource, Entity } from 'typeorm';
 import { toAuditColumns, toEntityAudit } from './audit.mapper.js';
 import { BaseOrmEntity } from './base.orm-entity.js';
 
 describe('BaseOrmEntity', () => {
-  it('should declare audit columns with snake_case names', () => {
-    const columns = getMetadataArgsStorage()
-      .columns.filter((c) => c.target === BaseOrmEntity)
-      .map((c) => [c.propertyName, c.mode, c.options.name]);
+  it('should map camelCase properties to explicit snake_case columns', async () => {
+    @Entity('samples')
+    class SampleOrmEntity extends BaseOrmEntity {
+      @Column({ name: 'display_name', type: 'varchar' })
+      displayName: string;
+    }
 
-    expect(columns).toEqual([
-      ['id', 'regular', undefined],
-      ['isActive', 'regular', 'is_active'],
-      ['createdDate', 'createDate', 'created_date'],
-      ['createdBy', 'regular', 'created_by'],
-      ['updatedDate', 'updateDate', 'updated_date'],
-      ['updatedBy', 'regular', 'updated_by'],
-      ['deletedDate', 'deleteDate', 'deleted_date'],
-      ['deletedBy', 'regular', 'deleted_by'],
-    ]);
+    const dataSource = new DataSource({
+      type: 'postgres',
+      entities: [SampleOrmEntity],
+    });
+    // Builds entity metadata without opening a connection.
+    await (
+      dataSource as unknown as { buildMetadatas(): Promise<void> }
+    ).buildMetadatas();
+
+    const columns = dataSource
+      .getMetadata(SampleOrmEntity)
+      .columns.map((c) => [c.propertyName, c.databaseName]);
+
+    expect(columns).toEqual(
+      expect.arrayContaining([
+        ['id', 'id'],
+        ['isActive', 'is_active'],
+        ['createdDate', 'created_date'],
+        ['createdBy', 'created_by'],
+        ['updatedDate', 'updated_date'],
+        ['updatedBy', 'updated_by'],
+        ['deletedDate', 'deleted_date'],
+        ['deletedBy', 'deleted_by'],
+        ['displayName', 'display_name'],
+      ]),
+    );
+    expect(columns).toHaveLength(9);
   });
 });
 

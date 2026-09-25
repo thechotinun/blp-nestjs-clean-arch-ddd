@@ -7,9 +7,10 @@ import {
 } from 'typeorm';
 
 // Id is generated in the domain (Entity base), so it is a plain PrimaryColumn.
+// Column names are explicit snake_case (createdBy -> created_by).
 // deletedDate is a DeleteDateColumn: soft-deleted rows are excluded from find* by default.
 export abstract class BaseOrmEntity {
-  @PrimaryColumn('uuid')
+  @PrimaryColumn({ name: 'id', type: 'uuid' })
   id: string;
 
   @Column({ name: 'is_active', type: 'boolean', default: true })

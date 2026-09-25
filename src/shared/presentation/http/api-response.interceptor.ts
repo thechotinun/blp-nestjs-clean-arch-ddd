@@ -9,7 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { map, Observable } from 'rxjs';
-import { Paginated } from '../../application/index.js';
+import { Paginated } from '../../domain/index.js';
 import type {
   ApiResponse,
   PaginatedApiResponse,

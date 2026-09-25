@@ -4,13 +4,19 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Inject,
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { STATUS_CODES } from 'node:http';
 import { DomainErrorType, DomainException } from '../../domain/index.js';
 import type { ApiErrorResponse } from './api-response.js';
 import { toResponseStatus } from './api-response.interceptor.js';
+import {
+  ERROR_CODE_REGISTRY,
+  ErrorCodeRegistry,
+  SystemErrorKey,
+} from './error-code.registry.js';
+import { RequestValidationException } from './validation.pipe.js';
 
 const DOMAIN_ERROR_STATUS: Record<DomainErrorType, HttpStatus> = {
   [DomainErrorType.VALIDATION]: HttpStatus.BAD_REQUEST,
@@ -21,37 +27,48 @@ const DOMAIN_ERROR_STATUS: Record<DomainErrorType, HttpStatus> = {
   [DomainErrorType.BUSINESS_RULE]: HttpStatus.UNPROCESSABLE_ENTITY,
 };
 
+interface ResolvedError {
+  statusCode: number;
+  key: string;
+  errors: unknown[];
+}
+
 /**
  * Converts every thrown error into the API error envelope.
- * Non-domain errors fall back to `error.code` = HTTP status and `error.message` = UPPER_SNAKE status text.
+ * `error.message` is the error key; `error.code` comes from the app error catalog.
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
+  constructor(
+    @Inject(ERROR_CODE_REGISTRY) private readonly registry: ErrorCodeRegistry,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
-    const { statusCode, body } = this.toErrorResponse(exception);
+    const { statusCode, key, errors } = this.resolve(exception);
 
-    response.status(statusCode).json(body);
+    response.status(statusCode).json({
+      status: toResponseStatus(statusCode),
+      error: { code: this.codeOf(key), message: key, errors },
+    } satisfies ApiErrorResponse);
   }
 
-  private toErrorResponse(exception: unknown): {
-    statusCode: number;
-    body: ApiErrorResponse;
-  } {
+  private resolve(exception: unknown): ResolvedError {
     if (exception instanceof DomainException) {
-      const statusCode = DOMAIN_ERROR_STATUS[exception.type];
       return {
-        statusCode,
-        body: {
-          status: toResponseStatus(statusCode),
-          error: {
-            code: exception.code,
-            message: exception.message,
-            errors: exception.errors,
-          },
-        },
+        statusCode: DOMAIN_ERROR_STATUS[exception.type],
+        key: exception.key,
+        errors: exception.errors,
+      };
+    }
+
+    if (exception instanceof RequestValidationException) {
+      return {
+        statusCode: HttpStatus.BAD_REQUEST,
+        key: SystemErrorKey.VALIDATE,
+        errors: exception.messages,
       };
     }
 
@@ -62,41 +79,40 @@ export class HttpExceptionFilter implements ExceptionFilter {
         typeof res === 'object' && res !== null && 'message' in res
           ? res.message
           : undefined;
-
       return {
         statusCode,
-        body: {
-          status: toResponseStatus(statusCode),
-          error: {
-            code: statusCode,
-            message: toErrorKey(statusCode),
-            // ValidationPipe puts its messages here as string[].
-            errors: Array.isArray(message) ? message : [],
-          },
-        },
+        key: httpStatusKey(statusCode),
+        errors: Array.isArray(message) ? message : [],
       };
     }
 
     this.logger.error(
       exception instanceof Error ? exception.stack : String(exception),
     );
-    const statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     return {
-      statusCode,
-      body: {
-        status: toResponseStatus(statusCode),
-        error: {
-          code: statusCode,
-          message: toErrorKey(statusCode),
-          errors: [],
-        },
-      },
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      key: SystemErrorKey.UNDEFINED,
+      errors: [],
     };
+  }
+
+  private codeOf(key: string): number {
+    const code = this.registry.codeOf(key);
+    if (code !== undefined) return code;
+
+    this.logger.warn(`Error key "${key}" is missing from the error catalog`);
+    return this.registry.codeOf(SystemErrorKey.UNDEFINED) ?? 0;
   }
 }
 
-function toErrorKey(statusCode: number): string {
-  return (STATUS_CODES[statusCode] ?? 'Error')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_');
+function httpStatusKey(statusCode: number): SystemErrorKey {
+  switch (statusCode) {
+    case HttpStatus.BAD_REQUEST:
+      return SystemErrorKey.BAD_REQUEST;
+    case HttpStatus.UNAUTHORIZED:
+    case HttpStatus.FORBIDDEN:
+      return SystemErrorKey.UNAUTHORIZED;
+    default:
+      return SystemErrorKey.UNDEFINED;
+  }
 }

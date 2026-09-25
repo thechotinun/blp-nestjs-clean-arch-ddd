@@ -27,17 +27,17 @@ src/
 ├── app.module.ts                 # ConfigModule (global) + DatabaseModule + bounded-context modules
 ├── config/                       # configuration.ts — env -> typed config (single source)
 ├── shared/                       # shared kernel — no business rules
-│   ├── domain/                   # Entity (+ EntityAudit), AggregateRoot, ValueObject, DomainEvent, exceptions/
-│   ├── application/              # UseCase<I, O>, Paginated<T>
-│   ├── infrastructure/database/  # DatabaseModule, TypeOrmConfigService, BaseOrmEntity, audit mapper, Mapper, data-source (CLI), migrations/
-│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, response types
-└── modules/<context>/            # one folder per bounded context
+│   ├── domain/                   # Entity (+ EntityAudit), AggregateRoot, ValueObject, DomainEvent, exceptions/, Repository port, Paginated
+│   ├── application/              # UseCase<I, O>
+│   ├── infrastructure/database/  # DatabaseModule, TypeOrmConfigService, BaseOrmEntity, TypeOrmBaseRepository, audit mapper, Mapper, data-source (CLI), migrations/
+│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, ValidationPipe, PaginationQueryDto, BaseResource
+└── modules/<context>/            # one folder per bounded context — reference implementation: modules/todo
     ├── domain/
     │   ├── <name>.entity.ts              # aggregate / entity (extends AggregateRoot / Entity)
     │   ├── value-objects/<name>.vo.ts
     │   ├── events/<name>.event.ts
     │   ├── exceptions/<name>.exception.ts   # extends DomainException
-    │   └── <name>.repository.ts          # repository port (interface + DI token)
+    │   └── <name>.repository.ts          # port: `interface XRepository extends Repository<X>` + `X_REPOSITORY` symbol
     ├── application/
     │   ├── use-cases/<action>.use-case.ts   # implements UseCase
     │   └── dto/                              # use-case input/output (plain types)
@@ -47,7 +47,8 @@ src/
     │   └── persistence/<name>.typeorm-repository.ts  # implements the domain port
     ├── presentation/
     │   ├── <name>.controller.ts
-    │   └── dto/                              # request DTOs (validation)
+    │   ├── <name>.resource.ts                # `toXResource(entity)` = { ...toBaseResource(entity), ...fields }
+    │   └── dto/                              # request DTOs (class-validator)
     └── <context>.module.ts
 ```
 
@@ -67,7 +68,13 @@ src/
 - **Imports:** relative paths with `.js` extension (`'./user.entity.js'`). No tsconfig `paths` aliases — tsc does not rewrite them in ESM output.
 - **No `__dirname` / `require`** — use `import.meta.url` / `import.meta.dirname`.
 - **Identity:** IDs are UUIDs generated in the domain (`Entity` base uses `randomUUID()`), so ORM PK is `@PrimaryColumn('uuid')` (from `BaseOrmEntity`), never `@PrimaryGeneratedColumn`.
-- **Audit fields:** every ORM entity extends `BaseOrmEntity` → `id`, `is_active`, `created_date/by`, `updated_date/by`, `deleted_date/by` (soft delete via `DeleteDateColumn`). Domain side: `Entity.audit` (`EntityAudit`), passed as 3rd arg on `restore(props, id, audit)`. In `*.mapper.ts` use `toEntityAudit(record)` / `...toAuditColumns(entity.audit)` — never map audit fields by hand. `*By` values are not set automatically yet.
+- **Audit fields:** every ORM entity extends `BaseOrmEntity` → `id`, `isActive`, `createdDate/By`, `updatedDate/By`, `deletedDate/By` (columns `is_active`, `created_by`, …) (soft delete via `DeleteDateColumn`). Domain side: `Entity.audit` (`EntityAudit`), passed as 3rd arg on `restore(props, id, audit)`. In `*.mapper.ts` use `toEntityAudit(record)` / `...toAuditColumns(entity.audit)` — never map audit fields by hand. `*By` values are not set automatically yet.
+- **Repositories:** domain port `Repository<T>` gives `findById`, `findAll(PaginationParams)`, `exists`, `save`, `delete` (soft). Implementation extends `TypeOrmBaseRepository<Domain, OrmEntity>` (constructor: `@InjectRepository(XOrmEntity)` repo + mapper). Module-specific queries: add to the module's port interface and implement in the module repository using `this.repository` / `this.mapper`. `save()` reloads the row so generated dates are returned.
+- **Use cases:** one class per action, `@Injectable()`, inject the port with `@Inject(X_REPOSITORY)`. Throw module `DomainException`s (e.g. not found) here, not in controllers.
+- **Validation:** global `ValidationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform`) → unknown body/query fields are rejected with 400. List endpoints take `@Query() PaginationQueryDto` → `query.toParams(configService.get('PER_PAGE'))` (`page` ≥ 1, `perPage` 1..100). Route ids use `ParseUUIDPipe`.
+- **Empty values:** respond with `null`, not `""`.
+- **Naming:** DB = snake_case, code = camelCase. Always set the column name explicitly in the decorator — no naming strategy: `@Column({ name: 'due_date', type: 'date', nullable: true }) dueDate`. Same for relations: `@JoinColumn({ name: 'assigned_user_id' })`. Table names explicit, plural snake_case: `@Entity('todos')`.
+- **Migrations:** generate with `npm run migration:generate -- src/shared/infrastructure/database/migrations/<Name>` (needs DB) or hand-write matching the naming strategy.
 - **Entities registration:** `autoLoadEntities: true` — register ORM entities with `TypeOrmModule.forFeature([...])` in each context module.
 - **Relations (ESM):** type relation properties with `Relation<T>` from typeorm to avoid circular-import TDZ errors:
   `@ManyToOne(() => UserOrmEntity) user: Relation<UserOrmEntity>;`
@@ -83,22 +90,28 @@ Routes are served under `/api/v1/...` (global prefix `api` + URI versioning, def
 
 - **Controllers return plain data** — never build the envelope by hand.
   - Single object → `{ data, status: { code, message } }`
-  - `Paginated<T>` (from `shared/application`) → `{ data, links, meta, status }`. Use `paginated.map(toResource)` to shape items.
+  - `Paginated<T>` (from `shared/domain`) → `{ data, links, meta, status }`. Use `paginated.map(toResource)` to shape items.
   - `status.code` is the real HTTP status (`201` for POST, `@HttpCode` respected). 204 / `StreamableFile` pass through unwrapped.
 - **Pagination links:** `first` = `?perPage=N`, `previous`/`next`/`last` = `?page=X&perPage=N`, `""` when absent. Other query params are kept.
-- **Errors:** throw a `DomainException` subclass from domain/application — never a Nest `HttpException` there.
+- **Errors:** throw a `DomainException` subclass from domain/application — never a Nest `HttpException` there. Domain knows only the error **key**; the numeric code lives in the catalog.
   ```ts
-  export class ExampleNotFoundException extends DomainException {
+  // modules/todo/domain/exceptions/todo-error-key.ts
+  export const TodoErrorKey = { NOT_FOUND: 'TODO_NOT_FOUND' } as const;
+  // modules/todo/domain/exceptions/todo-not-found.exception.ts
+  export class TodoNotFoundException extends DomainException {
     constructor() {
-      super(DomainErrorType.NOT_FOUND, 100101, 'EXAMPLE_NOT_FOUND');
+      super(DomainErrorType.NOT_FOUND, TodoErrorKey.NOT_FOUND);
     }
   }
   ```
-  Body: `{ status: { code, message }, error: { code, message, errors } }`. `DomainErrorType` → HTTP: VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, BUSINESS_RULE 422.
-- Non-domain errors: `HttpException` → `error.code` = HTTP status, `error.message` = UPPER_SNAKE status text, `errors` = ValidationPipe message array. Unknown errors → 500, logged, no internals in body.
+  Body: `{ status: { code, message }, error: { code: <catalog code>, message: <key>, errors } }`. `DomainErrorType` → HTTP: VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, BUSINESS_RULE 422.
+- **Error catalog — `src/error-codes.ts`** (composition root; the only place codes are assigned): `{ code: 'KEY' }`. Ranges: `9000xx` system, `1001xx` todo, next module `1002xx`.
+  - New module: add its codes to the catalog **and** its `XErrorKey` type to `ThrownErrorKey` there.
+  - Guards: duplicate code → TS1117; key thrown but missing from catalog → compile error naming the key; duplicate key → `ErrorCodeRegistry` throws at startup + `error-codes.spec.ts`.
+  - Shared layer receives the catalog via `ERROR_CODE_REGISTRY` (provided in `AppModule`) — shared never imports modules.
+- **Non-domain errors:** ValidationPipe → `900422 VALIDATE_ERROR` (`errors` = messages); other 400 → `900423 BAD_REQUEST`; 401/403 → `900403 UNAUTHORIZED`; anything else (unknown route, 500) → `0 UNDEFINED_ERROR`. Unknown errors are logged; no internals in body.
 
-## Pending (to be provided by the owner — do not invent)
+## Not yet implemented
 
-- **Base repository** → `shared/infrastructure/database/` (+ repository port in `shared/domain/`)
-
-Until these exist, do not create ad-hoc replacements; ask first.
+- Auth / current user → `createdBy` / `updatedBy` / `deletedBy` are always `null`.
+- Domain event dispatcher, transactions / unit of work, Swagger.

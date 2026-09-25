@@ -10,14 +10,21 @@ import {
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { Paginated } from '../../application/index.js';
-import { DomainErrorType, DomainException } from '../../domain/index.js';
+import {
+  DomainErrorType,
+  DomainException,
+  Paginated,
+} from '../../domain/index.js';
 import { ApiResponseInterceptor } from './api-response.interceptor.js';
+import {
+  ERROR_CODE_REGISTRY,
+  ErrorCodeRegistry,
+} from './error-code.registry.js';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
 class ExampleNotFoundException extends DomainException {
   constructor() {
-    super(DomainErrorType.NOT_FOUND, 100101, 'EXAMPLE_NOT_FOUND');
+    super(DomainErrorType.NOT_FOUND, 'EXAMPLE_NOT_FOUND');
   }
 }
 
@@ -70,6 +77,16 @@ describe('API response envelope', () => {
       providers: [
         { provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
         { provide: APP_FILTER, useClass: HttpExceptionFilter },
+        {
+          provide: ERROR_CODE_REGISTRY,
+          useValue: new ErrorCodeRegistry({
+            0: 'UNDEFINED_ERROR',
+            900403: 'UNAUTHORIZED',
+            900422: 'VALIDATE_ERROR',
+            900423: 'BAD_REQUEST',
+            100101: 'EXAMPLE_NOT_FOUND',
+          }),
+        },
       ],
     }).compile();
 
@@ -172,7 +189,7 @@ describe('API response envelope', () => {
     expect(res.body).toEqual({
       status: { code: 400, message: 'Bad Request' },
       error: {
-        code: 400,
+        code: 900423,
         message: 'BAD_REQUEST',
         errors: ['name must be a string', 'age is required'],
       },
@@ -185,7 +202,7 @@ describe('API response envelope', () => {
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
       status: { code: 404, message: 'Not Found' },
-      error: { code: 404, message: 'NOT_FOUND', errors: [] },
+      error: { code: 0, message: 'UNDEFINED_ERROR', errors: [] },
     });
   });
 
@@ -195,7 +212,7 @@ describe('API response envelope', () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({
       status: { code: 500, message: 'Internal Server Error' },
-      error: { code: 500, message: 'INTERNAL_SERVER_ERROR', errors: [] },
+      error: { code: 0, message: 'UNDEFINED_ERROR', errors: [] },
     });
   });
 });

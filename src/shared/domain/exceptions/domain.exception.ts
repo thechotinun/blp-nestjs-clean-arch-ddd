@@ -8,23 +8,24 @@ export enum DomainErrorType {
 }
 
 /**
- * Base for all business errors. HTTP-agnostic: presentation maps `type` to a status code.
+ * Base for all business errors. Knows only its error key (e.g. `TODO_NOT_FOUND`):
+ * the numeric code lives in the app-level catalog (`src/error-codes.ts`),
+ * and presentation maps `type` to an HTTP status.
  *
  * @example
- * export class ExampleNotFoundException extends DomainException {
+ * export class TodoNotFoundException extends DomainException {
  *   constructor() {
- *     super(DomainErrorType.NOT_FOUND, 100101, 'EXAMPLE_NOT_FOUND');
+ *     super(DomainErrorType.NOT_FOUND, TodoErrorKey.NOT_FOUND);
  *   }
  * }
  */
 export abstract class DomainException extends Error {
   protected constructor(
     readonly type: DomainErrorType,
-    readonly code: number,
-    message: string,
+    readonly key: string,
     readonly errors: unknown[] = [],
   ) {
-    super(message);
+    super(key);
     this.name = new.target.name;
   }
 }
