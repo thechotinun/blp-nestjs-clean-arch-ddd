@@ -74,11 +74,11 @@ describe('API response envelope', () => {
 				{
 					provide: ERROR_CODE_REGISTRY,
 					useValue: new ErrorCodeRegistry({
-						0: 'UNDEFINED_ERROR',
-						900403: 'UNAUTHORIZED',
-						900422: 'VALIDATE_ERROR',
-						900423: 'BAD_REQUEST',
-						100101: 'EXAMPLE_NOT_FOUND',
+						UNDEFINED_ERROR: 0,
+						UNAUTHORIZED: 900403,
+						VALIDATE_ERROR: 900422,
+						BAD_REQUEST: 900423,
+						EXAMPLE_NOT_FOUND: 100101,
 					}),
 				},
 			],

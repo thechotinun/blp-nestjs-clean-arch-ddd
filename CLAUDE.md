@@ -119,9 +119,9 @@ Routes are served under `/api/v1/...` (global prefix `api` + URI versioning, def
   }
   ```
   Body: `{ status: { code, message }, error: { code: <catalog code>, message: <key>, errors } }`. `DomainErrorType` → HTTP: VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, BUSINESS_RULE 422.
-- **Error catalog — `src/error-codes.ts`** (composition root; the only place codes are assigned): `{ code: 'KEY' }`. Ranges: `9000xx` system, `1001xx` todo, next module `1002xx`.
+- **Error catalog — `src/error-codes.ts`** (composition root; the only place codes are assigned): `{ KEY: code }`, `satisfies Record<ThrownErrorKey, number>`. Ranges: `9000xx` system, `1001xx` todo, next module `1002xx`.
   - New module: add its codes to the catalog **and** its `XErrorKey` type to `ThrownErrorKey` there.
-  - Guards: duplicate code → TS1117; key thrown but missing from catalog → compile error naming the key; duplicate key → `ErrorCodeRegistry` throws at startup + `error-codes.spec.ts`.
+  - Guards: duplicate key → TS1117; duplicate code → compile error (`noDuplicateCode`) + `ErrorCodeRegistry` at startup + `error-codes.spec.ts`; key thrown but missing from catalog → compile error naming the key; key nobody throws (typo/leftover) → excess-property compile error. Only list keys some `XErrorKey` defines. Keys name a violated business rule in domain language (`TODO_ALREADY_COMPLETED`), never a technical failure (`TODO_UPDATE_ERROR`) — persistence errors stay 500. Retired codes stay as a `// ... retired — do not reuse` comment.
   - Shared layer receives the catalog via `ERROR_CODE_REGISTRY` (provided in `AppModule`) — shared never imports modules.
 - **Non-domain errors:** ValidationPipe → `900422 VALIDATE_ERROR` (`errors` = messages); other 400 → `900423 BAD_REQUEST`; 401/403 → `900403 UNAUTHORIZED`; anything else (unknown route, 500) → `0 UNDEFINED_ERROR`. Unknown errors are logged; no internals in body.
 

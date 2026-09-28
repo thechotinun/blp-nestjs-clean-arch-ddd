@@ -297,19 +297,20 @@ Returning a `Paginated<T>` adds `links` and `meta`:
 
 ```ts
 export const ErrorCodes = {
-	0: 'UNDEFINED_ERROR',
-	900422: 'VALIDATE_ERROR',
+	UNDEFINED_ERROR: 0,
+	VALIDATE_ERROR: 900422,
 	// TODO 1001xx
-	100101: 'TODO_NOT_FOUND',
-	100106: 'INVALID_TODO_TITLE',
-} as const satisfies Record<number, string>;
+	TODO_NOT_FOUND: 100101,
+	INVALID_TODO_TITLE: 100106,
+} as const satisfies Record<ThrownErrorKey, number>;
 ```
 
 The domain only knows the key (`'TODO_NOT_FOUND'`), never the number. These guards catch mistakes when several people work in parallel:
 
-- A duplicate code does not compile (TS1117).
+- A duplicate key does not compile (TS1117).
+- A duplicate code does not compile (`noDuplicateCode`). It also fails at startup and in `error-codes.spec.ts`.
 - A key that is thrown but missing from the catalog does not compile. The error names the key.
-- A duplicate key fails at startup and in `error-codes.spec.ts`.
+- A key that nobody throws (a typo or a leftover) does not compile: "Did you mean ...?".
 
 Ranges: `9000xx` system, `1001xx` todo. Give each new module the next range: `1002xx`, `1003xx`, and so on.
 

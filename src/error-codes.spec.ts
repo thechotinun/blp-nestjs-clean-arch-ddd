@@ -2,7 +2,7 @@ import { ErrorCodes } from './error-codes.js';
 import { ErrorCodeRegistry, SystemErrorKey } from './shared/presentation/index.js';
 
 describe('ErrorCodes', () => {
-	it('should not reuse an error key for two codes', () => {
+	it('should not reuse an error code for two keys', () => {
 		expect(() => new ErrorCodeRegistry(ErrorCodes)).not.toThrow();
 	});
 
