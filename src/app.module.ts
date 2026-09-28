@@ -2,14 +2,13 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import configuration, { envFilePath } from './config/configuration.js';
-import { ErrorCodes } from './error-codes.js';
+import { resolveErrorKey } from './error-codes.js';
 import { TodoModule } from './modules/todo/todo.module.js';
 import { DatabaseModule } from './shared/infrastructure/database/index.js';
 import {
 	ApiResponseInterceptor,
 	createValidationPipe,
-	ERROR_CODE_REGISTRY,
-	ErrorCodeRegistry,
+	ERROR_KEY_RESOLVER,
 	HttpExceptionFilter,
 } from './shared/presentation/index.js';
 
@@ -25,8 +24,8 @@ import {
 	],
 	providers: [
 		{
-			provide: ERROR_CODE_REGISTRY,
-			useValue: new ErrorCodeRegistry(ErrorCodes),
+			provide: ERROR_KEY_RESOLVER,
+			useValue: resolveErrorKey,
 		},
 		{ provide: APP_PIPE, useFactory: createValidationPipe },
 		{ provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },

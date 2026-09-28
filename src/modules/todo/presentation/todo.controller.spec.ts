@@ -3,12 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { ErrorCodes } from '../../../error-codes.js';
+import { resolveErrorKey } from '../../../error-codes.js';
 import {
 	ApiResponseInterceptor,
 	createValidationPipe,
-	ERROR_CODE_REGISTRY,
-	ErrorCodeRegistry,
+	ERROR_KEY_RESOLVER,
 	HttpExceptionFilter,
 } from '../../../shared/presentation/index.js';
 import {
@@ -50,8 +49,8 @@ describe('TodoController (HTTP)', () => {
 				{ provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
 				{ provide: APP_FILTER, useClass: HttpExceptionFilter },
 				{
-					provide: ERROR_CODE_REGISTRY,
-					useValue: new ErrorCodeRegistry(ErrorCodes),
+					provide: ERROR_KEY_RESOLVER,
+					useValue: resolveErrorKey,
 				},
 			],
 		}).compile();

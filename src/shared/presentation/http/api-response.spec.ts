@@ -13,7 +13,7 @@ import request from 'supertest';
 import { Paginated } from '../../application/index.js';
 import { DomainErrorType, DomainException } from '../../domain/index.js';
 import { ApiResponseInterceptor } from './api-response.interceptor.js';
-import { ERROR_CODE_REGISTRY, ErrorCodeRegistry } from './error-code.registry.js';
+import { ERROR_KEY_RESOLVER, type ErrorKeyResolver } from './error-key.resolver.js';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
 class ExampleNotFoundException extends DomainException {
@@ -21,6 +21,18 @@ class ExampleNotFoundException extends DomainException {
 		super(DomainErrorType.NOT_FOUND, 'EXAMPLE_NOT_FOUND');
 	}
 }
+
+const sampleCodes: Record<string, number> = {
+	UNDEFINED_ERROR: 0,
+	UNAUTHORIZED: 900403,
+	VALIDATE_ERROR: 900422,
+	BAD_REQUEST: 900423,
+	EXAMPLE_NOT_FOUND: 100101,
+};
+const resolveSampleKey: ErrorKeyResolver = (key) => ({
+	code: sampleCodes[key] ?? 900001,
+	message: key,
+});
 
 const item = { id: '1c6d5a24-7453-4e46-8b7f-f56ef1d564e6', name: 'Sample' };
 
@@ -72,14 +84,8 @@ describe('API response envelope', () => {
 				{ provide: APP_INTERCEPTOR, useClass: ApiResponseInterceptor },
 				{ provide: APP_FILTER, useClass: HttpExceptionFilter },
 				{
-					provide: ERROR_CODE_REGISTRY,
-					useValue: new ErrorCodeRegistry({
-						UNDEFINED_ERROR: 0,
-						UNAUTHORIZED: 900403,
-						VALIDATE_ERROR: 900422,
-						BAD_REQUEST: 900423,
-						EXAMPLE_NOT_FOUND: 100101,
-					}),
+					provide: ERROR_KEY_RESOLVER,
+					useValue: resolveSampleKey,
 				},
 			],
 		}).compile();

@@ -35,7 +35,7 @@ src/
 │   ├── domain/                   # Entity (id + isActive), AggregateRoot, ValueObject, DomainEvent, DomainException, Repository port (write side)
 │   ├── application/              # UseCase<I, O>, QueryService port (read side), Paginated/PaginationParams, BaseView
 │   ├── infrastructure/database/  # DatabaseModule, TypeOrmConfigService, BaseOrmEntity, TypeOrmBaseRepository, TypeOrmBaseQueryService + toBaseView, Mapper, data-source (CLI), migrations/, testing/ (spec fixtures)
-│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, ErrorCodeRegistry, ValidationPipe, PaginationQueryDto
+│   └── presentation/http/        # ApiResponseInterceptor, HttpExceptionFilter, ErrorKeyResolver port, ValidationPipe, PaginationQueryDto
 └── modules/<context>/            # one folder per bounded context — reference implementation: modules/todo
     ├── domain/                   # write model: behaviour + invariants, no audit/pagination
     │   ├── <name>.entity.ts              # aggregate (extends AggregateRoot): create() / restore(props, id, isActive)
@@ -119,10 +119,10 @@ Routes are served under `/api/v1/...` (global prefix `api` + URI versioning, def
   }
   ```
   Body: `{ status: { code, message }, error: { code: <catalog code>, message: <key>, errors } }`. `DomainErrorType` → HTTP: VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, BUSINESS_RULE 422.
-- **Error catalog — `src/error-codes.ts`** (composition root; the only place codes are assigned): `{ KEY: code }`, `satisfies Record<ThrownErrorKey, number>`. Ranges: `9000xx` system, `1001xx` todo, next module `1002xx`.
+- **Error catalog — `src/error-codes.ts`** (composition root; the only place codes are assigned): `{ code: 'KEY' }`, `satisfies Record<number, ThrownErrorKey>`, plus `resolveErrorKey(key)` → `{ code, message }`. Ranges: `9000xx` system, `1001xx` todo, next module `1002xx`.
   - New module: add its codes to the catalog **and** its `XErrorKey` type to `ThrownErrorKey` there.
-  - Guards: duplicate key → TS1117; duplicate code → compile error (`noDuplicateCode`) + `ErrorCodeRegistry` at startup + `error-codes.spec.ts`; key thrown but missing from catalog → compile error naming the key; key nobody throws (typo/leftover) → excess-property compile error. Only list keys some `XErrorKey` defines. Keys name a violated business rule in domain language (`TODO_ALREADY_COMPLETED`), never a technical failure (`TODO_UPDATE_ERROR`) — persistence errors stay 500. Retired codes stay as a `// ... retired — do not reuse` comment.
-  - Shared layer receives the catalog via `ERROR_CODE_REGISTRY` (provided in `AppModule`) — shared never imports modules.
+  - Guards: duplicate code → TS1117; key nobody throws (typo/leftover) → compile error; duplicate key allowed (last wins); key thrown but missing from catalog → not checked at compile time — sent as `900001 UNREGISTERED_ERROR_KEY` + `Logger` warning. Only list keys some `XErrorKey` defines. Keys name a violated business rule in domain language (`TODO_ALREADY_COMPLETED`), never a technical failure (`TODO_UPDATE_ERROR`) — persistence errors stay 500. Retired codes stay as a `// ... retired — do not reuse` comment.
+  - Shared layer receives `resolveErrorKey` via `ERROR_KEY_RESOLVER` (`ErrorKeyResolver` port, provided in `AppModule`) — shared never imports modules.
 - **Non-domain errors:** ValidationPipe → `900422 VALIDATE_ERROR` (`errors` = messages); other 400 → `900423 BAD_REQUEST`; 401/403 → `900403 UNAUTHORIZED`; anything else (unknown route, 500) → `0 UNDEFINED_ERROR`. Unknown errors are logged; no internals in body.
 
 ## Not yet implemented

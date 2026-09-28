@@ -11,7 +11,7 @@ import type { Response } from 'express';
 import { DomainErrorType, DomainException } from '../../domain/index.js';
 import type { ApiErrorResponse } from './api-response.js';
 import { toResponseStatus } from './api-response.interceptor.js';
-import { ERROR_CODE_REGISTRY, ErrorCodeRegistry, SystemErrorKey } from './error-code.registry.js';
+import { ERROR_KEY_RESOLVER, type ErrorKeyResolver, SystemErrorKey } from './error-key.resolver.js';
 import { RequestValidationException } from './validation.pipe.js';
 
 const DOMAIN_ERROR_STATUS: Record<DomainErrorType, HttpStatus> = {
@@ -37,7 +37,7 @@ interface ResolvedError {
 export class HttpExceptionFilter implements ExceptionFilter {
 	private readonly logger = new Logger(HttpExceptionFilter.name);
 
-	constructor(@Inject(ERROR_CODE_REGISTRY) private readonly registry: ErrorCodeRegistry) {}
+	constructor(@Inject(ERROR_KEY_RESOLVER) private readonly resolveKey: ErrorKeyResolver) {}
 
 	catch(exception: unknown, host: ArgumentsHost): void {
 		const response = host.switchToHttp().getResponse<Response>();
@@ -45,7 +45,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 		response.status(statusCode).json({
 			status: toResponseStatus(statusCode),
-			error: { code: this.codeOf(key), message: key, errors },
+			error: { ...this.resolveKey(key), errors },
 		} satisfies ApiErrorResponse);
 	}
 
@@ -84,14 +84,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
 			key: SystemErrorKey.UNDEFINED,
 			errors: [],
 		};
-	}
-
-	private codeOf(key: string): number {
-		const code = this.registry.codeOf(key);
-		if (code !== undefined) return code;
-
-		this.logger.warn(`Error key "${key}" is missing from the error catalog`);
-		return this.registry.codeOf(SystemErrorKey.UNDEFINED) ?? 0;
 	}
 }
 
